@@ -1,8 +1,8 @@
 package jpa;
 
-import domain.Department;
-import domain.Employee;
-import jakarta.persistence.*;
+import domain.*;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityTransaction;
 
 import java.util.List;
 
@@ -15,64 +15,94 @@ public class JpaTest {
     }
 
     public static void main(String[] args) {
-        EntityManagerFactory factory = Persistence.createEntityManagerFactory("dev");
-        EntityManager manager = factory.createEntityManager();
+
+        EntityManager manager = EntityManagerHelper.getEntityManager();
         JpaTest test = new JpaTest(manager);
 
         EntityTransaction tx = manager.getTransaction();
-        tx.begin();
+
         try {
-            test.createDepartmentsAndEmployees();
+            tx.begin();
+
+            test.createUsersAndTickets();
+
+            tx.commit();
+
+            test.listAllTickets();
+            test.namedQueryExample();
+
         } catch (Exception e) {
             e.printStackTrace();
+            if (tx.isActive()) {
+                tx.rollback();
+            }
+        } finally {
+            EntityManagerHelper.closeEntityManager();
+            EntityManagerHelper.closeEntityManagerFactory();
         }
-        tx.commit();
 
-        test.listEmployees();
-        test.listDepartments();
-
-        manager.close();
         System.out.println(".. done");
     }
 
-    private void createDepartmentsAndEmployees() {
-        int numOfDepartments = manager.createQuery("Select d From Department d", Department.class).getResultList().size();
-        if (numOfDepartments == 0) {
-            Department javaDept = new Department("Java");
-            Department dbDept = new Department("Databases");
+    /**
+     * Création des utilisateurs et des tickets (héritage)
+     */
+    private void createUsersAndTickets() {
 
-            Employee emp1 = new Employee("Jakab Gipsz", javaDept);
-            Employee emp2 = new Employee("Captain Nemo", javaDept);
-            Employee emp3 = new Employee("Alice", dbDept);
-            Employee emp4 = new Employee("Bob", dbDept);
+        Long nbUsers = manager.createQuery(
+                        "SELECT COUNT(u) FROM User u", Long.class)
+                .getSingleResult();
 
-            javaDept.getEmployees().add(emp1);
-            javaDept.getEmployees().add(emp2);
-            dbDept.getEmployees().add(emp3);
-            dbDept.getEmployees().add(emp4);
+        if (nbUsers == 0) {
 
-            manager.persist(javaDept);
-            manager.persist(dbDept);
-            // Les employés seront persistés automatiquement grâce au cascade = PERSIST
+            User u1 = new User("Alice");
+            User u2 = new User("Bob");
+
+            Ticket t1 = new PremiumTicket(120.0, "A12", u1);
+            Ticket t2 = new LastMinuteTicket(50.0, u1);
+            Ticket t3 = new PremiumTicket(200.0, "VIP-1", u2);
+
+            u1.getTickets().add(t1);
+            u1.getTickets().add(t2);
+            u2.getTickets().add(t3);
+
+            manager.persist(u1);
+            manager.persist(u2);
         }
     }
 
-    private void listEmployees() {
-        List<Employee> employees = manager.createQuery("Select e From Employee e", Employee.class).getResultList();
-        System.out.println("Num of employees: " + employees.size());
-        for (Employee e : employees) {
-            System.out.println(e);
+    /**
+     * Requête JPQL classique
+     */
+    private void listAllTickets() {
+
+        List<Ticket> tickets =
+                manager.createQuery(
+                                "SELECT t FROM Ticket t",
+                                Ticket.class)
+                        .getResultList();
+
+        System.out.println("\n=== LISTE DES TICKETS ===");
+        for (Ticket t : tickets) {
+            System.out.println(t + " | User: " + t.getUser());
         }
     }
 
-    private void listDepartments() {
-        List<Department> departments = manager.createQuery("Select d From Department d", Department.class).getResultList();
-        System.out.println("Num of departments: " + departments.size());
-        for (Department d : departments) {
-            System.out.println(d);
-            for (Employee e : d.getEmployees()) {
-                System.out.println(" - " + e);
-            }
+    /**
+     * Requête nommée
+     */
+    private void namedQueryExample() {
+
+        List<Ticket> tickets =
+                manager.createNamedQuery(
+                                "Ticket.findByPriceGreaterThan",
+                                Ticket.class)
+                        .setParameter("price", 100.0)
+                        .getResultList();
+
+        System.out.println("\n=== TICKETS AVEC PRIX > 100 ===");
+        for (Ticket t : tickets) {
+            System.out.println(t);
         }
     }
 }

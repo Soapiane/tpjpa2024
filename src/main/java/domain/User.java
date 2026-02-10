@@ -1,6 +1,8 @@
 package domain;
 
 import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -10,28 +12,23 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
     private String name;
 
-    // 🔹 Constructeur vide OBLIGATOIRE pour JPA
-    public User() {
-    }
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<Ticket> tickets = new ArrayList<>();
 
-    // 🔹 Constructeur pratique
+    public User() {}
+
     public User(String name) {
         this.name = name;
     }
 
-    // 🔹 Getters / Setters
-    public Long getId() {
-        return id;
+    public List<Ticket> getTickets() {
+        return tickets;
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
+    @Override
+    public String toString() {
+        return "User{id=" + id + ", name='" + name + "'}";
     }
 }
